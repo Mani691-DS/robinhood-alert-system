@@ -1,27 +1,38 @@
-version: '3.8'
-
 services:
 
-  zookeeper:
-    image: bitnami/zookeeper:latest
-    container_name: zookeeper
-    ports:
-      - "2181:2181"
-    environment:
-      - ALLOW_ANONYMOUS_LOGIN=yes
-
   kafka:
-    image: bitnami/kafka:latest
+    image: apache/kafka:3.7.0
     container_name: kafka
     ports:
       - "9092:9092"
     environment:
-      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
-      - ALLOW_PLAINTEXT_LISTENER=yes
-    depends_on:
-      - zookeeper
+      # Unique ID for this Kafka broker node (we have only 1 node so it's 0)
+    - KAFKA_NODE_ID=0
+
+    # This single node acts as both broker (handles messages) and controller (manages cluster)
+    - KAFKA_PROCESS_ROLES=broker,controller
+
+    # Broker listens for messages on port 9092, controller listens internally on port 9093
+    - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+
+    # This is the address other services use to connect to Kafka from outside
+    - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
+
+    # Port 9093 is reserved for internal controller communication only
+    - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+
+    # Both controller and plaintext connections use no encryption (fine for local dev)
+    - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+
+    # This node (ID=0) is the controller and lives at kafka:9093 inside Docker network
+    - KAFKA_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
+
+    # Internal Kafka topic that tracks message offsets — only needs 1 copy since we have 1 broker
+    - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+
+    # Kafka automatically creates a topic when a service publishes to it (no manual setup needed)
+    - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+
 
   redis:
     image: redis:alpine
