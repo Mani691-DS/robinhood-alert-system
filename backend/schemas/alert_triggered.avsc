@@ -1,0 +1,14 @@
+{
+  "type": "record",
+  "name": "AlertTriggered",
+  "namespace": "com.stockalert",
+  "fields": [
+    {"name": "alert_id",        "type": "int"},
+    {"name": "user_phone",      "type": "string"},
+    {"name": "ticker",          "type": "string"},
+    {"name": "current_price",   "type": "double"},
+    {"name": "threshold_price", "type": "double"},
+    {"name": "direction",       "type": "string"},
+    {"name": "triggered_at",    "type": "string"}
+  ]
+}

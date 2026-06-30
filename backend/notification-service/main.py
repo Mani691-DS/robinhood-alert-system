@@ -1,12 +1,17 @@
-import json
 import logging
+import os
+import sys
 import time
 
 from kafka import KafkaConsumer
 from twilio.rest import Client
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from shared.schema_utils import deserialize
+
 from config import (
     KAFKA_BOOTSTRAP_SERVERS,
+    SCHEMA_REGISTRY_URL,
     TWILIO_ACCOUNT_SID,
     TWILIO_AUTH_TOKEN,
     TWILIO_WHATSAPP_FROM,
@@ -49,7 +54,7 @@ def main():
         bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
         group_id="notification-group",
         auto_offset_reset="earliest",   # don't miss alerts fired before this service started
-        value_deserializer=lambda v: json.loads(v.decode("utf-8")),
+        value_deserializer=lambda v: deserialize(v, SCHEMA_REGISTRY_URL),
     )
 
     twilio = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)

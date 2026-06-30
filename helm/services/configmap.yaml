@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  KAFKA_BOOTSTRAP_SERVERS: stock-alert-kafka-kafka-bootstrap:9092
+  SCHEMA_REGISTRY_URL: http://schema-registry:8081
+  REDIS_HOST: redis-master
+  REDIS_PORT: "6379"
+  TICKERS: AAPL,GOOGL,TSLA,MSFT,AMZN
+  # asyncpg:// prefix for alert-service; price-monitor/config.py strips +asyncpg automatically
+  DATABASE_URL: postgresql+asyncpg://postgres:hasura9723@host.minikube.internal:5432/mini-alert-system

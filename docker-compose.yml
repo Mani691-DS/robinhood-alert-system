@@ -12,17 +12,17 @@ services:
     # This single node acts as both broker (handles messages) and controller (manages cluster)
     - KAFKA_PROCESS_ROLES=broker,controller
 
-    # Broker listens for messages on port 9092, controller listens internally on port 9093
-    - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+    # PLAINTEXT=your machine (9092), CONTROLLER=internal KRaft (9093), INTERNAL=Docker containers (29092)
+    - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,INTERNAL://:29092
 
-    # This is the address other services use to connect to Kafka from outside
-    - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
+    # Your machine uses localhost:9092 | Docker containers use kafka:29092
+    - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092,INTERNAL://kafka:29092
 
     # Port 9093 is reserved for internal controller communication only
     - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
 
-    # Both controller and plaintext connections use no encryption (fine for local dev)
-    - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+    # Security protocol for each listener — all PLAINTEXT (no TLS) for local dev
+    - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT
 
     # This node (ID=0) is the controller and lives at kafka:9093 inside Docker network
     - KAFKA_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
@@ -33,6 +33,21 @@ services:
     # Kafka automatically creates a topic when a service publishes to it (no manual setup needed)
     - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
 
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.5.0
+    container_name: schema-registry
+    ports:
+      - "8081:8081"
+    environment:
+      # Hostname Schema Registry advertises itself as inside Docker network
+      - SCHEMA_REGISTRY_HOST_NAME=schema-registry
+      # Connects to Kafka via internal Docker listener (not localhost)
+      - SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS=kafka:29092
+      # Exposes REST API on port 8081
+      - SCHEMA_REGISTRY_LISTENERS=http://0.0.0.0:8081
+    depends_on:
+      - kafka
 
   redis:
     image: redis:alpine

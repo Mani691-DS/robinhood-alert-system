@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stock Alert Dashboard</title>
+  <!-- TradingView open-source charting library -->
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    /* ── Header ──────────────────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    h1 { font-size: 1.3rem; font-weight: 600; color: #58a6ff; }
+
+    #status {
+      font-size: 0.7rem; font-weight: 600;
+      padding: 3px 10px; border-radius: 20px;
+      letter-spacing: 0.5px; text-transform: uppercase;
+    }
+    #status.connected    { background: #1a3a2a; color: #3fb950; }
+    #status.disconnected { background: #3a1a1a; color: #f85149; }
+
+    #set-alert-btn {
+      display: flex; align-items: center; gap: 8px;
+      background: #1f6feb; color: #fff; border: none;
+      border-radius: 8px; padding: 9px 18px;
+      font-size: 0.88rem; font-weight: 600; cursor: pointer;
+      transition: background 0.15s;
+    }
+    #set-alert-btn:hover { background: #388bfd; }
+
+    /* ── Price cards ─────────────────────────────────────────────────────── */
+    .cards { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
+    .card {
+      background: #161b22; border: 1px solid #30363d;
+      border-top: 3px solid var(--accent);
+      border-radius: 8px; padding: 14px 18px; flex: 1; min-width: 130px;
+    }
+    .card .ticker { font-size: 0.68rem; font-weight: 700; letter-spacing: 1.2px; color: var(--accent); margin-bottom: 6px; }
+    .card .price  { font-size: 1.45rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .card .change { font-size: 0.75rem; margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .card .change.up   { color: #3fb950; }
+    .card .change.down { color: #f85149; }
+    .card .change.flat { color: #8b949e; }
+
+    /* ── Candlestick section ─────────────────────────────────────────────── */
+    .chart-section {
+      background: #161b22; border: 1px solid #30363d;
+      border-radius: 8px; overflow: hidden;
+    }
+
+    /* Ticker tabs */
+    .ticker-tabs { display: flex; border-bottom: 1px solid #30363d; }
+    .ticker-tab {
+      padding: 11px 20px; font-size: 0.82rem; font-weight: 600;
+      letter-spacing: 0.5px; background: none; border: none;
+      border-bottom: 2px solid transparent;
+      color: #8b949e; cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+      margin-bottom: -1px;
+    }
+    .ticker-tab:hover  { color: #e6edf3; }
+    .ticker-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* Controls bar */
+    .chart-controls {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px; border-bottom: 1px solid #21262d;
+    }
+    .tf-buttons { display: flex; gap: 4px; }
+    .tf-btn {
+      background: none; border: 1px solid #30363d; border-radius: 4px;
+      color: #8b949e; padding: 4px 12px;
+      font-size: 0.78rem; font-weight: 600; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .tf-btn:hover        { border-color: #58a6ff; color: #58a6ff; }
+    .tf-btn.active       { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+    .chart-meta { font-size: 0.73rem; color: #8b949e; }
+
+    /* Lightweight Charts container */
+    #chart-container { width: 100%; height: 430px; }
+
+    /* ── Modal ───────────────────────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+      display: flex; align-items: center; justify-content: center; z-index: 100;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal {
+      background: #161b22; border: 1px solid #30363d;
+      border-radius: 12px; padding: 28px 32px; width: 100%; max-width: 420px;
+    }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    .modal-header h2 { font-size: 1.05rem; font-weight: 600; }
+    .modal-close {
+      background: none; border: none; color: #8b949e;
+      font-size: 1.2rem; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+    }
+    .modal-close:hover { background: #21262d; color: #e6edf3; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block; font-size: 0.78rem; font-weight: 600;
+      color: #8b949e; margin-bottom: 6px;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .form-group input,
+    .form-group select {
+      width: 100%; background: #0d1117; border: 1px solid #30363d;
+      border-radius: 6px; padding: 9px 12px; color: #e6edf3; font-size: 0.92rem;
+    }
+    .form-group input:focus,
+    .form-group select:focus { outline: none; border-color: #1f6feb; }
+    .price-hint { font-size: 0.73rem; color: #8b949e; margin-top: 5px; }
+    .form-actions { display: flex; gap: 10px; margin-top: 24px; }
+    .btn-primary {
+      flex: 1; background: #1f6feb; color: #fff; border: none;
+      border-radius: 6px; padding: 10px; font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    }
+    .btn-primary:hover    { background: #388bfd; }
+    .btn-primary:disabled { background: #21262d; color: #8b949e; cursor: not-allowed; }
+    .btn-secondary {
+      flex: 1; background: #21262d; color: #e6edf3; border: 1px solid #30363d;
+      border-radius: 6px; padding: 10px; font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    }
+    .btn-secondary:hover { background: #30363d; }
+
+    /* ── Toasts ──────────────────────────────────────────────────────────── */
+    #toast-container {
+      position: fixed; bottom: 28px; right: 28px;
+      display: flex; flex-direction: column; gap: 10px; z-index: 200;
+    }
+    .toast {
+      min-width: 280px; max-width: 380px; padding: 13px 18px;
+      border-radius: 8px; font-size: 0.88rem; font-weight: 500;
+      line-height: 1.4; border-left: 4px solid;
+      opacity: 0; transform: translateX(30px);
+      transition: opacity 0.25s, transform 0.25s;
+    }
+    .toast.show          { opacity: 1; transform: translateX(0); }
+    .toast-info          { background: #161b22; border-color: #1f6feb; color: #e6edf3; }
+    .toast-success       { background: #0f2a1a; border-color: #3fb950; color: #3fb950; }
+    .toast-error         { background: #2a0f0f; border-color: #f85149; color: #f85149; }
+    .toast-alert         { background: #2a1a00; border-color: #ff9900; color: #ff9900; }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────────── -->
+<header>
+  <div class="header-left">
+    <h1>Live Stock Prices</h1>
+    <span id="status" class="disconnected">Connecting…</span>
+  </div>
+  <button id="set-alert-btn">🔔 Set Alert</button>
+</header>
+
+<!-- ── Price cards ─────────────────────────────────────────────────────────── -->
+<div class="cards" id="cards"></div>
+
+<!-- ── Candlestick chart ────────────────────────────────────────────────────── -->
+<div class="chart-section">
+  <div class="ticker-tabs"  id="ticker-tabs"></div>
+  <div class="chart-controls">
+    <div class="tf-buttons">
+      <button class="tf-btn active" data-tf="1m">1m</button>
+      <button class="tf-btn"        data-tf="5m">5m</button>
+      <button class="tf-btn"        data-tf="15m">15m</button>
+    </div>
+    <span class="chart-meta" id="chart-meta">Loading…</span>
+  </div>
+  <div id="chart-container"></div>
+</div>
+
+<!-- ── Set Alert Modal ─────────────────────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>🔔 Set Price Alert</h2>
+      <button class="modal-close" id="modal-close">✕</button>
+    </div>
+    <form id="alert-form">
+      <div class="form-group">
+        <label>Phone Number (WhatsApp)</label>
+        <input type="tel" id="phone-input" name="user_phone" placeholder="+91xxxxxxxxxx" required />
+      </div>
+      <div class="form-group">
+        <label>Ticker</label>
+        <select id="ticker-select" name="ticker">
+          <option value="AAPL">AAPL — Apple</option>
+          <option value="GOOGL">GOOGL — Alphabet</option>
+          <option value="TSLA">TSLA — Tesla</option>
+          <option value="MSFT">MSFT — Microsoft</option>
+          <option value="AMZN">AMZN — Amazon</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Direction</label>
+        <select name="direction">
+          <option value="above">Above — alert when price rises above threshold</option>
+          <option value="below">Below — alert when price drops below threshold</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Threshold Price ($)</label>
+        <input type="number" id="threshold-input" name="threshold_price" step="0.01" min="0.01" required />
+        <div class="price-hint" id="price-hint">Select a ticker to see its current price</div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn-secondary" id="cancel-btn">Cancel</button>
+        <button type="submit" class="btn-primary"   id="submit-btn">🔔 Set Alert</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Toasts ──────────────────────────────────────────────────────────────── -->
+<div id="toast-container"></div>
+
+<script>
+  // ── Config ──────────────────────────────────────────────────────────────────
+  const TICKERS    = ["AAPL", "GOOGL", "TSLA", "MSFT", "AMZN"];
+  const COLORS     = { AAPL: "#00d4aa", GOOGL: "#4285f4", TSLA: "#f85149", MSFT: "#00a4ef", AMZN: "#ff9900" };
+  const TIMEFRAMES = { "1m": 60, "5m": 300, "15m": 900 };
+  const ALERT_API  = "http://localhost:8001/alerts";
+
+  // ── State ────────────────────────────────────────────────────────────────────
+  let selectedTicker = "AAPL";
+  let tfSeconds      = 60;
+  let chart, candleSeries;
+  let liveCandle     = null;
+  let currentPrices  = {};
+  const prevPrices   = {};
+  const pendingAlerts = [];
+  const tickBuffer   = {};                          // in-memory tick store per ticker
+  TICKERS.forEach(t => tickBuffer[t] = []);
+
+  // ── Price cards ──────────────────────────────────────────────────────────────
+  const cardEls = {};
+  TICKERS.forEach(ticker => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.style.setProperty("--accent", COLORS[ticker]);
+    card.innerHTML = `
+      <div class="ticker">${ticker}</div>
+      <div class="price"  id="price-${ticker}">—</div>
+      <div class="change flat" id="change-${ticker}">—</div>`;
+    document.getElementById("cards").appendChild(card);
+    cardEls[ticker] = {
+      price:  document.getElementById(`price-${ticker}`),
+      change: document.getElementById(`change-${ticker}`),
+    };
+  });
+
+  function updateCards(prices) {
+    TICKERS.forEach(ticker => {
+      if (prices[ticker] === undefined) return;
+      const cur = prices[ticker], el = cardEls[ticker];
+      el.price.textContent = `$${cur.toFixed(2)}`;
+      if (prevPrices[ticker] !== undefined) {
+        const d    = cur - prevPrices[ticker];
+        const pct  = ((d / prevPrices[ticker]) * 100).toFixed(2);
+        const sign = d >= 0 ? "+" : "";
+        el.change.textContent = `${sign}${d.toFixed(2)} (${sign}${pct}%)`;
+        el.change.className   = `change ${d > 0 ? "up" : d < 0 ? "down" : "flat"}`;
+      }
+      prevPrices[ticker] = cur;
+    });
+  }
+
+  // ── Ticker tabs ──────────────────────────────────────────────────────────────
+  const tabsContainer = document.getElementById("ticker-tabs");
+  TICKERS.forEach(ticker => {
+    const btn = document.createElement("button");
+    btn.className      = `ticker-tab${ticker === "AAPL" ? " active" : ""}`;
+    btn.dataset.ticker = ticker;
+    btn.style.setProperty("--accent", COLORS[ticker]);
+    btn.textContent    = ticker;
+    btn.addEventListener("click", () => switchTicker(ticker));
+    tabsContainer.appendChild(btn);
+  });
+
+  function switchTicker(ticker) {
+    selectedTicker = ticker;
+    document.querySelectorAll(".ticker-tab").forEach(el =>
+      el.classList.toggle("active", el.dataset.ticker === ticker)
+    );
+    loadChart();
+  }
+
+  // ── Timeframe buttons ────────────────────────────────────────────────────────
+  document.querySelectorAll(".tf-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      tfSeconds = TIMEFRAMES[btn.dataset.tf];
+      document.querySelectorAll(".tf-btn").forEach(b => b.classList.toggle("active", b === btn));
+      loadChart();
+    });
+  });
+
+  // ── Lightweight Charts (TradingView open-source) ─────────────────────────────
+  function initChart() {
+    const container = document.getElementById("chart-container");
+
+    chart = LightweightCharts.createChart(container, {
+      width:  container.clientWidth,
+      height: 430,
+      layout: {
+        background: { type: LightweightCharts.ColorType.Solid, color: "#0d1117" },
+        textColor: "#8b949e",
+      },
+      grid: {
+        vertLines: { color: "#21262d" },
+        horzLines: { color: "#21262d" },
+      },
+      crosshair:       { mode: LightweightCharts.CrosshairMode.Normal },
+      rightPriceScale: { borderColor: "#30363d" },
+      timeScale: {
+        borderColor:    "#30363d",
+        timeVisible:    true,
+        secondsVisible: false,
+      },
+    });
+
+    candleSeries = chart.addCandlestickSeries({
+      upColor:       "#3fb950",
+      downColor:     "#f85149",
+      borderVisible: false,
+      wickUpColor:   "#3fb950",
+      wickDownColor: "#f85149",
+    });
+
+    new ResizeObserver(() => chart.applyOptions({ width: container.clientWidth }))
+      .observe(container);
+  }
+
+  // ── OHLC aggregation ─────────────────────────────────────────────────────────
+  // ticks = [{time: unix_ms, price: float}]
+  // returns [{time: unix_sec, open, high, low, close}] sorted ascending
+  function buildCandles(ticks) {
+    const map = new Map();
+    for (const { time, price } of ticks) {
+      const ct = Math.floor(time / 1000 / tfSeconds) * tfSeconds;   // candle open time in seconds
+      if (!map.has(ct)) {
+        map.set(ct, { time: ct, open: price, high: price, low: price, close: price });
+      } else {
+        const c  = map.get(ct);
+        c.high  = Math.max(c.high, price);
+        c.low   = Math.min(c.low, price);
+        c.close = price;
+      }
+    }
+    return [...map.values()].sort((a, b) => a.time - b.time);
+  }
+
+  // ── Load / reload candlestick chart ──────────────────────────────────────────
+  async function loadChart() {
+    liveCandle = null;
+    candleSeries.setData([]);
+
+    let allTicks = [];
+    try {
+      const since    = Date.now() - 60 * 60 * 1000;   // last 1 hour of history
+      const res      = await fetch(`/history/${selectedTicker}?since=${since}`);
+      const hist     = await res.json();
+      const lastHist = hist.length ? hist[hist.length - 1].time : 0;
+      // Merge with in-memory buffer to fill the gap between last history tick and now
+      const fresh    = tickBuffer[selectedTicker].filter(t => t.time > lastHist);
+      allTicks = [...hist, ...fresh];
+    } catch {
+      allTicks = tickBuffer[selectedTicker];
+    }
+
+    const candles = buildCandles(allTicks);
+    candleSeries.setData(candles);
+
+    if (candles.length) {
+      liveCandle = { ...candles[candles.length - 1] };
+      document.getElementById("chart-meta").textContent =
+        `${candles.length} candles — times in UTC`;
+    } else {
+      document.getElementById("chart-meta").textContent =
+        "Waiting for first candle to close…";
+    }
+  }
+
+  // ── Live candle update from WebSocket tick ────────────────────────────────────
+  function updateLiveCandle(price, ts) {
+    const ct = Math.floor(ts / 1000 / tfSeconds) * tfSeconds;
+
+    // Guard: skip ticks that are somehow older than the current live candle
+    if (liveCandle && ct < liveCandle.time) return;
+
+    if (liveCandle && liveCandle.time === ct) {
+      liveCandle.high  = Math.max(liveCandle.high, price);
+      liveCandle.low   = Math.min(liveCandle.low, price);
+      liveCandle.close = price;
+    } else {
+      // New candle period — start fresh
+      liveCandle = { time: ct, open: price, high: price, low: price, close: price };
+    }
+
+    try {
+      candleSeries.update(liveCandle);
+    } catch (e) {
+      console.warn("Candle update skipped:", e.message);
+    }
+  }
+
+  // ── Pending alert watcher ─────────────────────────────────────────────────────
+  function checkPendingAlerts(prices) {
+    for (let i = pendingAlerts.length - 1; i >= 0; i--) {
+      const { ticker, threshold, direction } = pendingAlerts[i];
+      const price = prices[ticker];
+      if (price === undefined) continue;
+
+      const triggered =
+        (direction === "above" && price >= threshold) ||
+        (direction === "below" && price <= threshold);
+
+      if (triggered) {
+        showToast(
+          `🚨 WhatsApp alert sent!\n${ticker} hit $${price.toFixed(2)} (${direction} $${threshold.toFixed(2)})`,
+          "alert", 7000
+        );
+        pendingAlerts.splice(i, 1);
+      }
+    }
+  }
+
+  // ── WebSocket ─────────────────────────────────────────────────────────────────
+  const statusEl = document.getElementById("status");
+
+  function connect() {
+    const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(`${protocol}//${location.host}/ws`);
+
+    ws.onopen = () => {
+      statusEl.textContent = "Live";
+      statusEl.className   = "connected";
+    };
+
+    ws.onmessage = ({ data }) => {
+      const { prices, ts } = JSON.parse(data);
+      currentPrices = prices;
+
+      updateCards(prices);
+      checkPendingAlerts(prices);
+
+      // Buffer every tick (max ~90 min per ticker)
+      TICKERS.forEach(ticker => {
+        if (prices[ticker] !== undefined) {
+          tickBuffer[ticker].push({ time: ts, price: prices[ticker] });
+          if (tickBuffer[ticker].length > 5400) tickBuffer[ticker].shift();
+        }
+      });
+
+      // Update live candle for the selected ticker
+      if (prices[selectedTicker] !== undefined) {
+        updateLiveCandle(prices[selectedTicker], ts);
+      }
+    };
+
+    ws.onclose = () => {
+      statusEl.textContent = "Reconnecting…";
+      statusEl.className   = "disconnected";
+      setTimeout(connect, 3000);
+    };
+
+    ws.onerror = () => ws.close();
+  }
+
+  // ── Modal ─────────────────────────────────────────────────────────────────────
+  const modal        = document.getElementById("modal");
+  const tickerSelect = document.getElementById("ticker-select");
+  const priceHint    = document.getElementById("price-hint");
+  const thresholdIn  = document.getElementById("threshold-input");
+
+  function updatePriceHint() {
+    const price = currentPrices[tickerSelect.value];
+    if (price !== undefined) {
+      priceHint.textContent = `Current price: $${price.toFixed(2)}`;
+      thresholdIn.value     = price.toFixed(2);
+    }
+  }
+
+  document.getElementById("set-alert-btn").addEventListener("click", () => {
+    updatePriceHint();
+    modal.classList.remove("hidden");
+  });
+  document.getElementById("modal-close").addEventListener("click", () => modal.classList.add("hidden"));
+  document.getElementById("cancel-btn").addEventListener("click",  () => modal.classList.add("hidden"));
+  modal.addEventListener("click", e => { if (e.target === modal) modal.classList.add("hidden"); });
+  tickerSelect.addEventListener("change", updatePriceHint);
+
+  document.getElementById("alert-form").addEventListener("submit", async e => {
+    e.preventDefault();
+    const submitBtn = document.getElementById("submit-btn");
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Setting…";
+
+    const fd = new FormData(e.target);
+    const payload = {
+      user_phone:      fd.get("user_phone"),
+      ticker:          fd.get("ticker"),
+      threshold_price: parseFloat(fd.get("threshold_price")),
+      direction:       fd.get("direction"),
+    };
+
+    try {
+      const res = await fetch(ALERT_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || `HTTP ${res.status}`);
+
+      pendingAlerts.push({
+        ticker:    payload.ticker,
+        threshold: payload.threshold_price,
+        direction: payload.direction,
+      });
+      modal.classList.add("hidden");
+      e.target.reset();
+      showToast(
+        `✅ Alert set!\nWatching ${payload.ticker} ${payload.direction} $${payload.threshold_price.toFixed(2)}`,
+        "info", 5000
+      );
+    } catch (err) {
+      showToast(`❌ Failed: ${err.message}`, "error", 5000);
+    } finally {
+      submitBtn.disabled    = false;
+      submitBtn.textContent = "🔔 Set Alert";
+    }
+  });
+
+  // ── Toast ─────────────────────────────────────────────────────────────────────
+  function showToast(message, type = "info", duration = 4000) {
+    const container = document.getElementById("toast-container");
+    const toast = document.createElement("div");
+    toast.className    = `toast toast-${type}`;
+    toast.style.whiteSpace = "pre-line";
+    toast.textContent  = message;
+    container.appendChild(toast);
+    requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add("show")));
+    setTimeout(() => {
+      toast.classList.remove("show");
+      toast.addEventListener("transitionend", () => toast.remove(), { once: true });
+    }, duration);
+  }
+
+  // ── Boot ──────────────────────────────────────────────────────────────────────
+  initChart();
+  loadChart();
+  connect();
+</script>
+
+</body>
+</html>

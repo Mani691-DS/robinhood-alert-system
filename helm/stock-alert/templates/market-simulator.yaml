@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-market-simulator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-market-simulator
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-market-simulator
+    spec:
+      containers:
+        - name: market-simulator
+          image: market-simulator:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-config

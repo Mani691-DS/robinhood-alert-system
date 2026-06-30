@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+data:
+  KAFKA_BOOTSTRAP_SERVERS: {{ .Values.kafka.bootstrapServers | quote }}
+  SCHEMA_REGISTRY_URL:     {{ .Values.schemaRegistry.url | quote }}
+  REDIS_HOST:              {{ .Values.redis.host | quote }}
+  REDIS_PORT:              {{ .Values.redis.port | quote }}
+  TICKERS:                 {{ .Values.tickers | quote }}
+  DATABASE_URL:            {{ .Values.database.url | quote }}

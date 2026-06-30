@@ -1,0 +1,41 @@
+# Single source of truth for the entire stock-alert Helm chart.
+# Override any value at deploy time:
+#   helm install stock-alert ./helm/stock-alert --set image.tag=v1.2.0
+# Or per environment:
+#   helm install stock-alert ./helm/stock-alert -f values-prod.yaml
+
+kafka:
+  bootstrapServers: stock-alert-kafka-kafka-bootstrap:9092
+
+schemaRegistry:
+  url: http://schema-registry:8081
+
+redis:
+  host: redis-master
+  port: 6379
+
+# PostgreSQL runs on the host machine; host.minikube.internal routes to it from pods.
+# price-monitor/config.py strips +asyncpg automatically for psycopg2.
+database:
+  url: postgresql+asyncpg://postgres:hasura9723@host.minikube.internal:5432/mini-alert-system
+
+tickers: "AAPL,GOOGL,TSLA,MSFT,AMZN"
+
+image:
+  tag: latest
+  pullPolicy: Never   # Minikube local images — never pull from registry
+
+twilio:
+  accountSid: "your_account_sid"
+  authToken: "your_auth_token"
+  whatsappFrom: "whatsapp:+14155238886"
+
+alertService:
+  replicas: 1
+  port: 8001
+  nodePort: 30001
+
+dashboardService:
+  replicas: 1
+  port: 8002
+  nodePort: 30002

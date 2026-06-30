@@ -1,5 +1,7 @@
 import json
 import logging
+import os
+import sys
 import time
 from datetime import datetime
 
@@ -10,7 +12,14 @@ from kafka import KafkaConsumer, KafkaProducer
 from kafka.admin import KafkaAdminClient, NewTopic
 from kafka.errors import TopicAlreadyExistsError
 
-from config import DATABASE_URL, KAFKA_BOOTSTRAP_SERVERS, REDIS_HOST, REDIS_PORT, TICKERS
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from shared.schema_utils import deserialize, register_schema, serialize
+
+from config import DATABASE_URL, KAFKA_BOOTSTRAP_SERVERS, REDIS_HOST, REDIS_PORT, SCHEMA_REGISTRY_URL, TICKERS
+
+ALERT_TRIGGERED_SCHEMA = json.load(
+    open(os.path.join(os.path.dirname(__file__), '..', 'schemas', 'alert_triggered.avsc'))
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s  %(levelname)s  %(message)s")
 log = logging.getLogger(__name__)
@@ -44,6 +53,14 @@ def main():
 
     ensure_alert_topic()
 
+    # Register alert.triggered schema once at startup
+    alert_schema_id = register_schema(
+        SCHEMA_REGISTRY_URL,
+        subject="alert.triggered-value",
+        schema=ALERT_TRIGGERED_SCHEMA,
+    )
+    log.info(f"Alert schema registered. ID: {alert_schema_id}")
+
     # ── Kafka consumer: listen to all ticker topics ───────────────────────────
     topics = [f"stock.prices.{t}" for t in TICKERS]
     consumer = KafkaConsumer(
@@ -51,13 +68,13 @@ def main():
         bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
         group_id="price-monitor-group",
         auto_offset_reset="latest",
-        value_deserializer=lambda v: json.loads(v.decode("utf-8")),
+        value_deserializer=lambda v: deserialize(v, SCHEMA_REGISTRY_URL),
     )
 
     # ── Kafka producer: publish triggered alerts ──────────────────────────────
     producer = KafkaProducer(
         bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
-        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+        value_serializer=lambda v: serialize(v, ALERT_TRIGGERED_SCHEMA, alert_schema_id),
     )
 
     # ── Redis client ──────────────────────────────────────────────────────────
@@ -77,6 +94,11 @@ def main():
         # 1. Cache latest price in Redis
         cache.set(f"price:{ticker}", price)
         log.info(f"[{ticker}]  ${price:.2f}  →  Redis updated")
+
+        # 1b. Store tick in sorted set for candlestick history (24-hour rolling window)
+        now_ms = int(time.time() * 1000)
+        cache.zadd(f"ticks:{ticker}", {f"{now_ms}:{price}": now_ms})
+        cache.zremrangebyscore(f"ticks:{ticker}", 0, now_ms - 86_400_000)
 
         # 2. Fetch all active alerts for this ticker
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:

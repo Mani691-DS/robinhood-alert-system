@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-dashboard-service
+spec:
+  replicas: {{ .Values.dashboardService.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-dashboard-service
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-dashboard-service
+    spec:
+      containers:
+        - name: dashboard-service
+          image: dashboard-service:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.dashboardService.port }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-config
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.dashboardService.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-dashboard-service
+spec:
+  selector:
+    app: {{ .Release.Name }}-dashboard-service
+  type: NodePort
+  ports:
+    - port: {{ .Values.dashboardService.port }}
+      targetPort: {{ .Values.dashboardService.port }}
+      nodePort: {{ .Values.dashboardService.nodePort }}

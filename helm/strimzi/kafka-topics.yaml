@@ -1,0 +1,71 @@
+# KafkaTopic CRs managed by Strimzi Entity Operator.
+# Strimzi maps metadata.name (k8s-safe) to spec.topicName (actual Kafka topic).
+#
+# Apply after Kafka cluster is Ready:
+#   kubectl apply -f helm/strimzi/kafka-topics.yaml -n stock-alert
+
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: stock-prices-aapl
+  labels:
+    strimzi.io/cluster: stock-alert-kafka
+spec:
+  partitions: 1
+  replicas: 1
+  topicName: stock.prices.AAPL
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: stock-prices-googl
+  labels:
+    strimzi.io/cluster: stock-alert-kafka
+spec:
+  partitions: 1
+  replicas: 1
+  topicName: stock.prices.GOOGL
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: stock-prices-tsla
+  labels:
+    strimzi.io/cluster: stock-alert-kafka
+spec:
+  partitions: 1
+  replicas: 1
+  topicName: stock.prices.TSLA
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: stock-prices-msft
+  labels:
+    strimzi.io/cluster: stock-alert-kafka
+spec:
+  partitions: 1
+  replicas: 1
+  topicName: stock.prices.MSFT
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: stock-prices-amzn
+  labels:
+    strimzi.io/cluster: stock-alert-kafka
+spec:
+  partitions: 1
+  replicas: 1
+  topicName: stock.prices.AMZN
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: alert-triggered
+  labels:
+    strimzi.io/cluster: stock-alert-kafka
+spec:
+  partitions: 3
+  replicas: 1
+  topicName: alert.triggered

@@ -1,0 +1,10 @@
+{
+  "type": "record",
+  "name": "StockPrice",
+  "namespace": "com.stockalert",
+  "fields": [
+    {"name": "ticker",    "type": "string"},
+    {"name": "price",     "type": "double"},
+    {"name": "timestamp", "type": "string"}
+  ]
+}

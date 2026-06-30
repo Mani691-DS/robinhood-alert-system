@@ -1,0 +1,23 @@
+# Bitnami Redis Helm values — standalone, no auth, no persistence (Minikube dev)
+#
+# Install:
+#   helm repo add bitnami https://charts.bitnami.com/bitnami
+#   helm install redis bitnami/redis -f helm/redis/values.yaml -n stock-alert
+#
+# This creates Service "redis-master" on port 6379 — matches REDIS_HOST in ConfigMap.
+
+architecture: standalone
+
+auth:
+  enabled: false
+
+master:
+  persistence:
+    enabled: false
+  resources:
+    requests:
+      memory: 64Mi
+      cpu: 50m
+    limits:
+      memory: 128Mi
+      cpu: 100m

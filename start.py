@@ -12,6 +12,7 @@ COLORS = {
     "market-simulator":     "\033[94m",   # blue
     "price-monitor":        "\033[93m",   # yellow
     "notification-service": "\033[95m",   # magenta
+    "dashboard-service":    "\033[96m",   # cyan
 }
 RESET = "\033[0m"
 
@@ -35,6 +36,11 @@ SERVICES = [
         "name": "notification-service",
         "cmd":  [sys.executable, "main.py"],
         "cwd":  os.path.join(BASE, "backend", "notification-service"),
+    },
+    {
+        "name": "dashboard-service",
+        "cmd":  [sys.executable, "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002", "--reload"],
+        "cwd":  os.path.join(BASE, "backend", "dashboard-service"),
     },
 ]
 
